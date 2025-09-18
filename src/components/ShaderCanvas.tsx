@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import vertexShader from "../shaders/vertex.glsl?raw";
 import fragmentShader from "../shaders/fragment.glsl?raw";
+import tonemapShader from "../shaders/tonemap.glsl?raw";
 import { quat, vec3 } from "gl-matrix";
-
-const VERTEX_SHADER = vertexShader;
-const FRAGMENT_SHADER = fragmentShader;
 
 const secondsSinceStart = () => {
   return performance.now() / 1000;
@@ -21,7 +19,8 @@ const compileShader = (
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
     const log = gl.getShaderInfoLog(shader);
     gl.deleteShader(shader);
-    throw new Error(`Shader compile error: ${log}`);
+    console.error("could not compile shader : ", log);
+    return null;
   }
   return shader;
 };
@@ -33,6 +32,11 @@ const createProgram = (
 ) => {
   const vs = compileShader(gl, gl.VERTEX_SHADER, vsSrc);
   const fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSrc);
+  if (vs === null || fs === null) {
+    console.error("shader compilation failed");
+    return null;
+  }
+
   const program = gl.createProgram()!;
   gl.attachShader(program, vs);
   gl.attachShader(program, fs);
@@ -40,8 +44,10 @@ const createProgram = (
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     const log = gl.getProgramInfoLog(program);
     gl.deleteProgram(program);
-    throw new Error(`Program link error: ${log}`);
+    console.error("could not link program : ", log);
+    return null;
   }
+
   // shaders can be deleted after linking
   gl.deleteShader(vs);
   gl.deleteShader(fs);
@@ -63,34 +69,42 @@ const ShaderCanvas = () => {
     }
 
     // Compile and link
-    let program: WebGLProgram;
-    try {
-      program = createProgram(gl, VERTEX_SHADER, FRAGMENT_SHADER);
-    } catch (err) {
-      console.error(err);
+    let scenProgram = createProgram(gl, vertexShader, fragmentShader);
+    if (scenProgram === null) {
+      console.error("failed to create scene shader program");
+      return;
+    }
+
+    // TODO : Finish this; we need to use this with a FBO and do tonemapping as a post-process
+    // 1. We need to average out the frames over time
+    // 2. Tonemapping as a post-process
+    // 3. Reset the accumulation when the camera instrinsics change
+    let tonemapProgram = createProgram(gl, vertexShader, tonemapShader);
+    if (tonemapProgram === null) {
+      console.error("failed to create tonemap shader program");
       return;
     }
 
     // full-screen quad drawn as two triangles
-    const displayVertices = new Float32Array([
+    const quadVboData = new Float32Array([
       -1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1,
     ]);
 
-    const displayVerticesBufferId = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, displayVerticesBufferId);
-    gl.bufferData(gl.ARRAY_BUFFER, displayVertices, gl.STATIC_DRAW);
+    const quadVboId = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadVboId);
+    gl.bufferData(gl.ARRAY_BUFFER, quadVboData, gl.STATIC_DRAW);
 
-    const posLoc = gl.getAttribLocation(program, "aPosition");
+    const posLoc = gl.getAttribLocation(scenProgram, "aPosition");
     gl.enableVertexAttribArray(posLoc);
     gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
     // Uniform locations
-    const iResolutionLoc = gl.getUniformLocation(program, "iResolution");
-    const iTimeLoc = gl.getUniformLocation(program, "iTime");
-    const iCamPositionLoc = gl.getUniformLocation(program, "iCamPosition");
-    const iCamRotationLoc = gl.getUniformLocation(program, "iCamRotation");
+    const iResolutionLoc = gl.getUniformLocation(scenProgram, "iResolution");
+    const iTimeLoc = gl.getUniformLocation(scenProgram, "iTime");
+    const iCamPositionLoc = gl.getUniformLocation(scenProgram, "iCamPosition");
+    const iCamRotationLoc = gl.getUniformLocation(scenProgram, "iCamRotation");
 
     const resize = () => {
       if (gl === null) return;
@@ -109,7 +123,7 @@ const ShaderCanvas = () => {
       if (gl === null) return;
 
       resize();
-      gl.useProgram(program);
+      gl.useProgram(scenProgram);
 
       if (iResolutionLoc) {
         gl.uniform2f(iResolutionLoc, canvas.width, canvas.height);
@@ -136,8 +150,8 @@ const ShaderCanvas = () => {
 
     // cleanup
     return () => {
-      gl.deleteBuffer(displayVerticesBufferId);
-      gl.deleteProgram(program);
+      gl.deleteBuffer(quadVboId);
+      gl.deleteProgram(scenProgram);
     };
   }, []);
 
