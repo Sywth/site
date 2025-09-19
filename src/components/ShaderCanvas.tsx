@@ -69,8 +69,8 @@ const ShaderCanvas = () => {
     }
 
     // Compile and link
-    let scenProgram = createProgram(gl, vertexShader, fragmentShader);
-    if (scenProgram === null) {
+    let sceneProgram = createProgram(gl, vertexShader, fragmentShader);
+    if (sceneProgram === null) {
       console.error("failed to create scene shader program");
       return;
     }
@@ -91,20 +91,28 @@ const ShaderCanvas = () => {
     ]);
 
     const quadVboId = gl.createBuffer();
+
+    // Attribute setup
+    const bindAttribs = (program: WebGLProgram) => {
+      const posLoc = gl.getAttribLocation(program, "aPosition");
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadVboId);
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+    };
+
     gl.bindBuffer(gl.ARRAY_BUFFER, quadVboId);
     gl.bufferData(gl.ARRAY_BUFFER, quadVboData, gl.STATIC_DRAW);
+    bindAttribs(sceneProgram);
 
-    const posLoc = gl.getAttribLocation(scenProgram, "aPosition");
-    gl.enableVertexAttribArray(posLoc);
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+    // While its bound, upload data
+    gl.bufferData(gl.ARRAY_BUFFER, quadVboData, gl.STATIC_DRAW);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-    // Uniform locations
-    const iResolutionLoc = gl.getUniformLocation(scenProgram, "iResolution");
-    const iTimeLoc = gl.getUniformLocation(scenProgram, "iTime");
-    const iCamPositionLoc = gl.getUniformLocation(scenProgram, "iCamPosition");
-    const iCamRotationLoc = gl.getUniformLocation(scenProgram, "iCamRotation");
+    // FBO setup
+    const fbo = gl.createFramebuffer();
+    const sceneTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
     const resize = () => {
       if (gl === null) return;
@@ -116,42 +124,104 @@ const ShaderCanvas = () => {
         canvas.width = width;
         canvas.height = height;
         gl.viewport(0, 0, width, height);
+
+        // Resize FBO attachments
+        gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA,
+          width,
+          height,
+          0,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          null
+        );
+
+        gl.renderbufferStorage(
+          gl.RENDERBUFFER,
+          gl.DEPTH_COMPONENT16,
+          width,
+          height
+        );
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(
+          gl.FRAMEBUFFER,
+          gl.COLOR_ATTACHMENT0,
+          gl.TEXTURE_2D,
+          sceneTex,
+          0
+        );
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       }
     };
 
+    // Uniform locations
+    const iSceneResLoc = gl.getUniformLocation(sceneProgram, "iResolution");
+    const iTimeLoc = gl.getUniformLocation(sceneProgram, "iTime");
+    const iCamPositionLoc = gl.getUniformLocation(sceneProgram, "iCamPosition");
+    const iCamRotationLoc = gl.getUniformLocation(sceneProgram, "iCamRotation");
+
+    const iToneMapResLoc = gl.getUniformLocation(tonemapProgram, "iResolution");
+    const iSceneLoc = gl.getUniformLocation(tonemapProgram, "iScene");
+    const iGammaLoc = gl.getUniformLocation(tonemapProgram, "iGamma");
+    const iExposureLoc = gl.getUniformLocation(tonemapProgram, "iExposure");
+
+    let currFrame: number;
     const frame = () => {
       if (gl === null) return;
 
       resize();
-      gl.useProgram(scenProgram);
 
-      if (iResolutionLoc) {
-        gl.uniform2f(iResolutionLoc, canvas.width, canvas.height);
-      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.useProgram(sceneProgram);
+      bindAttribs(sceneProgram);
 
-      if (iTimeLoc) {
-        gl.uniform1f(iTimeLoc, secondsSinceStart());
-      }
+      if (iSceneResLoc) gl.uniform2f(iSceneResLoc, canvas.width, canvas.height);
+      if (iTimeLoc) gl.uniform1f(iTimeLoc, secondsSinceStart());
+      if (iCamPositionLoc) gl.uniform3fv(iCamPositionLoc, cameraPosition);
+      if (iCamRotationLoc) gl.uniform4fv(iCamRotationLoc, cameraRotation);
 
-      if (iCamPositionLoc) {
-        gl.uniform3fv(iCamPositionLoc, cameraPosition);
-      }
-
-      if (iCamRotationLoc) {
-        gl.uniform4fv(iCamRotationLoc, cameraRotation);
-      }
-
+      gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
-      requestAnimationFrame(frame);
+
+      // Tonemapping pass
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.useProgram(tonemapProgram);
+      bindAttribs(tonemapProgram);
+
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, sceneTex);
+
+      if (iToneMapResLoc) {
+        gl.uniform2f(iToneMapResLoc, canvas.width, canvas.height);
+      }
+      if (iSceneLoc) gl.uniform1i(iSceneLoc, 0);
+      if (iGammaLoc) gl.uniform1f(iGammaLoc, 2.2);
+      if (iExposureLoc) gl.uniform1f(iExposureLoc, 1.0);
+
+      gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      currFrame = requestAnimationFrame(frame);
     };
 
-    // start loop
-    requestAnimationFrame(frame);
+    // start loop; keep track of frame for deleting later
+    currFrame = requestAnimationFrame(frame);
 
     // cleanup
     return () => {
+      cancelAnimationFrame(currFrame);
+
       gl.deleteBuffer(quadVboId);
-      gl.deleteProgram(scenProgram);
+      gl.deleteTexture(sceneTex);
+      gl.deleteFramebuffer(fbo);
+      gl.deleteProgram(sceneProgram);
+      gl.deleteProgram(tonemapProgram);
     };
   }, []);
 
