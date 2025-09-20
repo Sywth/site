@@ -1,4 +1,3 @@
-import { useState } from "react";
 import ShaderCanvas from "./ShaderCanvas";
 
 const GlassBox: React.FC<{ className?: string; children: React.ReactNode }> = ({

@@ -119,10 +119,10 @@ const clearFbo = (gl: WebGL2RenderingContext, fbo: WebGLFramebuffer) => {
 
 const mouseMoveSens = vec2.fromValues(0.005, 0.005);
 const moveSpeed = 0.1;
-const worldUp = vec3.fromValues(0, 1, 0);
 const worldRight = vec3.fromValues(1, 0, 0);
 const worldForward = vec3.fromValues(0, 0, -1);
 
+// TODO : Get movement and rotation working on mobile
 const GetDeltaMovement = (keysPressed: Set<string>, rotation: quat) => {
   const moveDir = vec3.create();
   if (keysPressed.size > 0) {
