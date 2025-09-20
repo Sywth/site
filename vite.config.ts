@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import tailwindcss from '@tailwindcss/vite'
-import string from 'vite-plugin-string';
+import path from 'path/win32';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -10,4 +10,9 @@ export default defineConfig({
         tailwindcss(),
     ],
     base: "/site",
+    resolve: {
+        alias: {
+            "@": path.resolve(__dirname, "./src"),
+        },
+    },
 })
