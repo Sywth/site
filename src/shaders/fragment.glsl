@@ -1,4 +1,6 @@
 #version 300 es
+#define FEATURE_TAA 
+
 precision highp float;
 
 uniform vec2 iResolution;
@@ -11,6 +13,7 @@ uniform sampler2D iPrevAcc;
 uniform int iFrameIndex;
 
 uniform bool iPathTrace; 
+int iMaxPathLength = 5;
 
 out vec4 outColor;
 
@@ -20,10 +23,10 @@ const float TMAX = 1e20;
 
 // -------------------- Scene Structs --------------------
 struct Material {
-    vec3 lightIntensity;
-    vec3 diffuse;
-    vec3 specular;
-    float glossiness;
+    vec3 emissive;      // color of light source & its intensity
+    vec3 diffuse;       // base color
+    vec3 specular;      // what wavelengths are reflected
+    float glossiness;   // dictates the angle / sharpness of reflection lobe
 };
 
 struct Sphere {
@@ -61,7 +64,7 @@ Plane NewWall(vec3 normal, float d, Material material) {
 
 Material NewPaper(vec3 color) {
     Material m;
-    m.lightIntensity = vec3(0.0);
+    m.emissive = vec3(0.0);
     m.diffuse = color;
     m.specular = vec3(0.0);
     m.glossiness = 1.0;
@@ -70,7 +73,7 @@ Material NewPaper(vec3 color) {
 
 Material NewLight(vec3 intensity) {
     Material m;
-    m.lightIntensity = intensity;
+    m.emissive = intensity;
     m.diffuse = vec3(0.0);
     m.specular = vec3(0.0);
     m.glossiness = 1.0;
@@ -79,7 +82,7 @@ Material NewLight(vec3 intensity) {
 
 Material NewOrangePlastic() {
     Material m;
-    m.lightIntensity = vec3(0.0);
+    m.emissive = vec3(0.0);
     m.diffuse = vec3(1.0, 0.5, 0.0);
     m.specular = vec3(0.5);
     m.glossiness = 50.0;
@@ -88,11 +91,18 @@ Material NewOrangePlastic() {
 
 Material NewMirror() {
     Material m;
-    m.lightIntensity = vec3(0.0);
+    m.emissive = vec3(0.0);
     m.diffuse = vec3(0.0);
     m.specular = vec3(1.0);
     m.glossiness = 1000.0;
     return m;
+}
+
+Ray NewRay(vec3 origin, vec3 direction) {
+    Ray r;
+    r.origin = origin;
+    r.direction = direction;
+    return r;
 }
 
 // -------------------- Utility --------------------
@@ -135,7 +145,7 @@ float randFloat() {
 // -------------------- Geometry Intersections --------------------
 HitInfo getEmptyHit() {
     Material m;
-    m.lightIntensity = vec3(0.0);
+    m.emissive = vec3(0.0);
     m.diffuse = vec3(0.0);
     m.specular = vec3(0.0);
     m.glossiness = 0.0;
@@ -175,7 +185,7 @@ HitInfo intersectSphere(const Ray ray, const Sphere sphere, const float tMin, co
     vec3 normal = 
         length(ray.origin - sphere.position) < sphere.radius + 0.001? 
         -normalize(hitPosition - sphere.position) : 
-        normalize(hitPosition - sphere.position);      
+        +normalize(hitPosition - sphere.position);      
 
     return HitInfo(
         true,
@@ -202,18 +212,22 @@ Sphere spheres[sphereCount];
 Plane planes[planeCount];
 
 void loadScene() {
+    // Big orange sphere 
     spheres[0].position = vec3(-1.5, 0.5, -7.0);
     spheres[0].radius = 1.5;
     spheres[0].material = NewOrangePlastic();
 
+    // Small mirror sphere
     spheres[1].position = vec3(1.5, 0.0, -5.0);
     spheres[1].radius = 1.0;
     spheres[1].material = NewMirror();
 
+    // Med Top light sphere
     spheres[2].position = vec3(2.0, 2.0, -5.0);
     spheres[2].radius = 0.5;
     spheres[2].material = NewLight(vec3(3.0, 4.0, 3.5));
 
+    // Tiny bottom light sphere
     spheres[3].position = vec3(-2.5, -0.5, -3.0);
     spheres[3].radius = 0.15;
     spheres[3].material = NewLight(vec3(10.0, 8.0, 6.0));
@@ -222,7 +236,7 @@ void loadScene() {
     // celling 
     planes[0].normal = vec3(0.0, 1.0, 0.0);
     planes[0].d = 1.0;
-    planes[0].material.lightIntensity = vec3(0.0);
+    planes[0].material.emissive = vec3(0.0);
     planes[0].material.diffuse = vec3(0.8);
     planes[0].material.specular = vec3(0.0);
     planes[0].material.glossiness = 1.0;
@@ -230,7 +244,7 @@ void loadScene() {
     // left wall
     planes[1].normal = vec3(1.0, 0.0, 0.0);
     planes[1].d = 6.0;
-    planes[1].material.lightIntensity = vec3(0.0);
+    planes[1].material.emissive = vec3(0.0);
     planes[1].material.diffuse = vec3(1.0, 0.0, 0.0);
     planes[1].material.specular = vec3(0.0);
     planes[1].material.glossiness = 1.0;
@@ -238,7 +252,7 @@ void loadScene() {
     // right wall
     planes[2].normal = vec3(-1.0, 0.0, 0.0);
     planes[2].d = 6.0;
-    planes[2].material.lightIntensity = vec3(0.0);
+    planes[2].material.emissive = vec3(0.0);
     planes[2].material.diffuse = vec3(0.0, 1.0, 0.0);
     planes[2].material.specular = vec3(0.0);
     planes[2].material.glossiness = 1.0;
@@ -246,7 +260,7 @@ void loadScene() {
     // back wall
     planes[3].normal = vec3(0.0, 0.0, 1.0);
     planes[3].d = 10.0; 
-    planes[3].material.lightIntensity = vec3(0.0);
+    planes[3].material.emissive = vec3(0.0);
     planes[3].material.diffuse = vec3(0.8);
     planes[3].material.specular = vec3(0.0);
     planes[3].material.glossiness = 1.0;
@@ -254,7 +268,7 @@ void loadScene() {
     // floor
     planes[4].normal = vec3(0.0, -1.0, 0.0);
     planes[4].d = 5.0;
-    planes[4].material.lightIntensity = vec3(0.0);
+    planes[4].material.emissive = vec3(0.0);
     planes[4].material.diffuse = vec3(0.8);
     planes[4].material.specular = vec3(0.0);
     planes[4].material.glossiness = 1.0;
@@ -275,48 +289,120 @@ HitInfo intersectScene(Ray ray) {
 }
 
 // -------------------- Path Tracing --------------------
-// Assumes n is normalized
-vec3 randomHemisphere(vec3 n) {
-    float u = randFloat();
-    float v = randFloat();
-
-    float theta = acos(sqrt(1.0 - u));
-    float phi = 2.0 * M_PI * v;
-    
-    vec3 d = vec3(sin(theta)*cos(phi), sin(theta)*sin(phi), cos(theta));
-
-    // build basis (use y+ unless its too similar to n)
-    vec3 up = abs(n.y) < 0.99 ? vec3(0,1,0) : vec3(1,0,0);
-    vec3 tangent = normalize(cross(up, n));
-    vec3 bitangent = cross(n, tangent);
-    return normalize(tangent * d.x + bitangent * d.y + n * d.z);
+vec3 sphericalToEuclidean(float theta, float phi) {
+    return vec3(
+        sin(phi) * cos(theta),
+        cos(phi),
+        sin(phi) * sin(theta)
+    );
 }
 
-// TODO : Review this and add specular/glossy support
-vec3 tracePath(Ray ray) {
-    vec3 throughput = vec3(1.0);
-    vec3 radiance = vec3(0.0);
-    for (int bounce = 0; bounce < 3; bounce++) {
-        HitInfo h = intersectScene(ray);
+mat3 getToLocalFrame(const vec3 normal) {
+	// if z.y is close to the canonical y axis 
+	//	then for precision (and correctness in the case z.y = y_canonical) 
+	//	use nonParallel as canonical x 
+	vec3 nonParallel = abs(normal.y) > 0.9 ? vec3(1, 0, 0) : vec3(0, 1, 0);	// Used to generate x,y axes 
+	vec3 tangent = normalize(cross(normal, nonParallel));	// xAxis
+    vec3 bitangent = cross(normal, tangent);				// yAxis
+	return mat3(tangent, bitangent, normal);
+}
+
+// TODO : Review this 
+void sampleDirectionCosineWeighted(
+    const vec3 normal, out float probability, out vec3 direction
+) {
+    float xi_1 = randFloat();
+    float xi_2 = randFloat();
+
+    // Cosine-weighted hemisphere sampling
+    float cosTheta = sqrt(xi_1);
+    float sinTheta = sqrt(1.0 - xi_1); // sqrt(1.0 - xi_1)
+    float phi = 2.0 * M_PI * xi_2;
+
+    vec3 localDir;
+    localDir.x = cos(phi) * sinTheta;
+    localDir.y = sin(phi) * sinTheta;
+    localDir.z = cosTheta;
+
+    mat3 toWorld = getToLocalFrame(normal);
+    direction = toWorld * localDir;
+
+    // PDF for cosine-weighted sampling is cos(theta) / PI
+    // Since localDir.z is cosTheta, we can use that directly.
+    probability = localDir.z / M_PI; 
+}
+
+// L_o (x, w_o) = L_e(x, w_o) = \int_\Omega f_r(x, w_i, w_o) L_i(x, w_i) <w, n> dw_i
+
+// <w_i, n> 
+float getGeometricTerm(const Material material, const vec3 normal, const vec3 outDir) {
+    // Vec3 inputs should be normalized
+    float cosThetaOut = max(dot(normal, outDir), 0.0);
+    return cosThetaOut;
+}
+
+// f_r(x, w_i, w_o) 
+vec3 getReflectance(const Material material, const vec3 normal, const vec3 inDir, const vec3 outDir) {
+    // Vec3 inputs should be normalized
+    vec3 reflected = reflect(-inDir, normal);
+
+    vec3 diffuse = material.diffuse / M_PI;
+    vec3 specular = material.specular;
+    specular *= (material.glossiness + 2.0) / (2.0 * M_PI);
+    specular *= pow(max(dot(outDir, reflected), 0.0), material.glossiness);
+
+    return (diffuse + specular) / 2.0;
+}
+
+vec3 tracePath(Ray incomingRay) {
+    vec3 result = vec3(0.0);
+    vec3 throughput = vec3(1.0);    
+
+    for (int i = 0; i < iMaxPathLength; i++) {
+        HitInfo h = intersectScene(incomingRay);
         if (!h.hit) break;
-        if (length(h.material.lightIntensity) > 0.0) {
-            radiance += throughput * h.material.lightIntensity;
-            break;
-        }
-        vec3 nextDir = randomHemisphere(h.normal);
-        throughput *= h.material.diffuse;
-        ray.origin = h.position + 0.001 * h.normal;
-        ray.direction = nextDir;
+
+        result += throughput * h.material.emissive;
+
+        Ray outgoingRay;
+        float probability;
+        // sampleDirection(
+        //     h.normal, 
+        //     probability,            // set probability in place
+        //     outgoingRay.direction   // set direction in place
+        // );
+        sampleDirectionCosineWeighted(
+            h.normal, 
+            probability,            // set probability in place
+            outgoingRay.direction   // set direction in place
+        );
+
+        outgoingRay.direction = normalize(outgoingRay.direction);
+        outgoingRay.origin = h.position + h.normal * 1e-5; // avoid self-intersection
+
+        float geometricTerm = getGeometricTerm(h.material, h.normal, outgoingRay.direction);
+        if (geometricTerm < 1e-6) break; // avoid division by zero
+
+        vec3 reflectance = getReflectance(h.material, h.normal, incomingRay.direction, outgoingRay.direction);
+        throughput *= reflectance * geometricTerm;
+        throughput /= probability;
+
+
+        // prepare for next bounce
+        incomingRay = outgoingRay;
     }
-    return radiance;
+
+    return result;
 }
+
+
 
 // Simple ray caster the main path tracer 
 vec3 rayCast(Ray ray) {
     HitInfo h = intersectScene(ray);
     if (!h.hit) return vec3(0.0);
-    if (length(h.material.lightIntensity) > 0.0) {
-        return h.material.lightIntensity;
+    if (length(h.material.emissive) > 0.0) {
+        return h.material.emissive;
     }
     return h.material.diffuse;
 }
@@ -331,6 +417,11 @@ vec3 rotateByQuaternion(vec3 v, vec4 q) {
 
 Ray generateCameraRay(vec2 uv, vec3 cameraPos, vec4 cameraRot) {
     vec3 localOrigin = vec3(0.0, 0.0, 0.0);
+
+#ifdef FEATURE_TAA
+    uv += vec2(randFloat() - 0.5, randFloat() - 0.5) / iResolution.xy;
+#endif
+
     vec3 localDir = normalize(vec3(uv * 2.0 - 1.0, -1.5));
     vec3 worldOrigin = cameraPos + rotateByQuaternion(localOrigin, cameraRot);
     vec3 worldDir = rotateByQuaternion(localDir, cameraRot);
