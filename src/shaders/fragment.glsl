@@ -307,14 +307,13 @@ mat3 getToLocalFrame(const vec3 normal) {
 	return mat3(tangent, bitangent, normal);
 }
 
-// TODO : Review this 
+// TODO : Review this at once
 void sampleDirectionCosineWeighted(
     const vec3 normal, out float probability, out vec3 direction
 ) {
     float xi_1 = randFloat();
     float xi_2 = randFloat();
 
-    // Cosine-weighted hemisphere sampling
     float cosTheta = sqrt(xi_1);
     float sinTheta = sqrt(1.0 - xi_1); // sqrt(1.0 - xi_1)
     float phi = 2.0 * M_PI * xi_2;
@@ -332,7 +331,27 @@ void sampleDirectionCosineWeighted(
     probability = localDir.z / M_PI; 
 }
 
-// L_o (x, w_o) = L_e(x, w_o) = \int_\Omega f_r(x, w_i, w_o) L_i(x, w_i) <w, n> dw_i
+// First attempt at a re-write got glitches
+// const float varReductionIntensity = 1.0; // in range [0, inf)
+// void sampleDirectionCosineWeighted(
+//     const vec3 normal, out float probability, out vec3 direction
+// ) {
+//     float xi_1 = randFloat();
+//     float xi_2 = randFloat();
+
+//     float power = 1.0 / (varReductionIntensity + 1.0);
+//     float theta = acos(pow(1.0 - xi_1, power));
+//     float phi = 2.0 * M_PI * xi_2;  
+
+//     // Set direction in local frame
+//     mat3 toWorld = getToLocalFrame(normal);
+//     direction = toWorld * sphericalToEuclidean(theta, phi);
+
+//     // PDF = (n+1) * cos^n(theta) / (2*pi)
+//     probability = (varReductionIntensity + 1.0) * pow(cos(theta), varReductionIntensity) / (2.0 * M_PI);
+// }
+
+
 
 // <w_i, n> 
 float getGeometricTerm(const Material material, const vec3 normal, const vec3 outDir) {
@@ -346,14 +365,14 @@ vec3 getReflectance(const Material material, const vec3 normal, const vec3 inDir
     // Vec3 inputs should be normalized
     vec3 reflected = reflect(-inDir, normal);
 
-    vec3 diffuse = material.diffuse / M_PI;
-    vec3 specular = material.specular;
-    specular *= (material.glossiness + 2.0) / (2.0 * M_PI);
-    specular *= pow(max(dot(outDir, reflected), 0.0), material.glossiness);
+    vec3 effectiveSpecular = material.specular;
+    effectiveSpecular *= (material.glossiness + 2.0) / (2.0 * M_PI);
+    effectiveSpecular *= pow(max(dot(outDir, reflected), 0.0), material.glossiness);
 
-    return (diffuse + specular) / 2.0;
+    return (material.diffuse + effectiveSpecular) / 2.0;
 }
 
+// L_o (x, w_o) = L_e(x, w_o) + \int_\Omega f_r(x, w_i, w_o) L_i(x, w_i) <w, n> dw_i
 vec3 tracePath(Ray incomingRay) {
     vec3 result = vec3(0.0);
     vec3 throughput = vec3(1.0);    
@@ -362,15 +381,11 @@ vec3 tracePath(Ray incomingRay) {
         HitInfo h = intersectScene(incomingRay);
         if (!h.hit) break;
 
+        // += L_e
         result += throughput * h.material.emissive;
 
         Ray outgoingRay;
         float probability;
-        // sampleDirection(
-        //     h.normal, 
-        //     probability,            // set probability in place
-        //     outgoingRay.direction   // set direction in place
-        // );
         sampleDirectionCosineWeighted(
             h.normal, 
             probability,            // set probability in place
