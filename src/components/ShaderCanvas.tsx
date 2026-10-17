@@ -265,23 +265,25 @@ const ShaderCanvas = () => {
     // Create FBOs and Textures for accumulation (ping-ponging)
     const [renderWidth, renderHeight] = getRenderSize();
 
-    let { tex: accTex1, fbo: maybeFbo1 } = createTexFboPair(
+    const pair1 = createTexFboPair(
       gl,
       renderWidth,
       renderHeight
     );
-    let { tex: accTex2, fbo: maybeFbo2 } = createTexFboPair(
+    const pair2 = createTexFboPair(
       gl,
       renderWidth,
       renderHeight
     );
 
-    if (!maybeFbo1 || !maybeFbo2) {
+    if (!pair1.fbo || !pair2.fbo) {
       console.error("failed to create fbos");
       return;
     }
-    let fbo1: WebGLFramebuffer = maybeFbo1;
-    let fbo2: WebGLFramebuffer = maybeFbo2;
+    let accTex1 = pair1.tex;
+    let accTex2 = pair2.tex;
+    let fbo1: WebGLFramebuffer = pair1.fbo;
+    let fbo2: WebGLFramebuffer = pair2.fbo;
 
     // Initialize textures to black
     clearFbo(gl, fbo1);
@@ -305,8 +307,8 @@ const ShaderCanvas = () => {
         gl.deleteTexture(accTex2);
         gl.deleteFramebuffer(fbo2);
 
-        let pair1 = createTexFboPair(gl, renderWidth, renderHeight);
-        let pair2 = createTexFboPair(gl, renderWidth, renderHeight);
+        const pair1 = createTexFboPair(gl, renderWidth, renderHeight);
+        const pair2 = createTexFboPair(gl, renderWidth, renderHeight);
 
         accTex1 = pair1.tex;
         accTex2 = pair2.tex;
