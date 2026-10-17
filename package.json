@@ -1,40 +1,40 @@
 {
-    "name": "portfolio-syte-path-tracer",
-    "homepage": "https://Sywth.github.io/site",
-    "private": true,
-    "version": "0.0.0",
-    "type": "module",
-    "scripts": {
-        "dev": "vite",
-        "build": "tsc -b && vite build",
-        "lint": "eslint .",
-        "preview": "vite preview"
-    },
-    "dependencies": {
-        "class-variance-authority": "latest",
-        "clsx": "latest",
-        "gl-matrix": "latest",
-        "lucide-react": "latest",
-        "react": "latest",
-        "react-dom": "latest",
-        "tailwind-merge": "latest"
-    },
-    "devDependencies": {
-        "@eslint/js": "latest",
-        "@tailwindcss/vite": "latest",
-        "@types/node": "latest",
-        "@types/react": "latest",
-        "@types/react-dom": "latest",
-        "@typescript/native": "npm:typescript@latest",
-        "@vitejs/plugin-react-swc": "latest",
-        "eslint": "latest",
-        "eslint-plugin-react-hooks": "latest",
-        "eslint-plugin-react-refresh": "latest",
-        "globals": "latest",
-        "tailwindcss": "latest",
-        "tw-animate-css": "latest",
-        "typescript": "npm:@typescript/typescript6@latest",
-        "typescript-eslint": "latest",
-        "vite": "latest"
-    }
+  "name": "portfolio-syte-path-tracer",
+  "homepage": "https://Sywth.github.io/site",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "class-variance-authority": "latest",
+    "clsx": "latest",
+    "gl-matrix": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwind-merge": "latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@tailwindcss/vite": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@typescript/native": "npm:typescript@latest",
+    "@vitejs/plugin-react-swc": "latest",
+    "eslint": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "globals": "latest",
+    "tailwindcss": "latest",
+    "tw-animate-css": "latest",
+    "typescript": "npm:@typescript/typescript6@latest",
+    "typescript-eslint": "latest",
+    "vite": "latest"
+  }
 }
