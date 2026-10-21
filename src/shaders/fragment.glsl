@@ -154,6 +154,17 @@ void loadScene() {
     planes[4] = Plane(vec3(0.0, -1.0, 0.0), 5.0, whitePaper);
 }
 
+// add extra AO to path tracer on walls
+float extraWallAmbientOcclusion(vec3 position, vec3 normal, float ao_strength) {
+    float edgeDistance = TMAX;
+    for (int i = 0; i < planeCount; i++) {
+        if (abs(dot(normal, planes[i].normal)) > 0.5) continue;
+        float distance = abs(dot(planes[i].normal, position) + planes[i].d);
+        edgeDistance = min(edgeDistance, distance);
+    }
+    return mix(1.0 - ao_strength, 1.0, smoothstep(0.0, 0.5, edgeDistance));
+}
+
 HitInfo intersectScene(Ray ray) {
     HitInfo best = getEmptyHit();
     best.t = TMAX;
@@ -165,7 +176,9 @@ HitInfo intersectScene(Ray ray) {
 
     for (int i = 0; i < planeCount; i++) {
         HitInfo hit = intersectPlane(ray, planes[i]);
-        if (hit.hit && hit.t < best.t) best = hit;
+        if (!hit.hit || hit.t >= best.t) continue;
+        best = hit;
+        best.material.diffuse *= extraWallAmbientOcclusion(hit.position, hit.normal, 0.3);
     }
 
     return best;
