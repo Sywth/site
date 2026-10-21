@@ -50,7 +50,10 @@ const createRenderTarget = (gl: WebGL2RenderingContext) => {
   return { texture, framebuffer };
 };
 
-export const createRenderer = (canvas: HTMLCanvasElement, onFpsChange: (fps: number) => void) => {
+export const createRenderer = (
+  canvas: HTMLCanvasElement,
+  onStatsChange: (fps: number, samples: number) => void,
+) => {
   const gl = canvas.getContext("webgl2");
   if (!gl || !gl.getExtension("EXT_color_buffer_float")) {
     console.error("WebGL2 with float colour buffers is required.");
@@ -77,7 +80,6 @@ export const createRenderer = (canvas: HTMLCanvasElement, onFpsChange: (fps: num
 
   const sceneUniforms = {
     resolution: gl.getUniformLocation(sceneProgram, "iResolution"),
-    time: gl.getUniformLocation(sceneProgram, "iTime"),
     position: gl.getUniformLocation(sceneProgram, "iCamPosition"),
     rotation: gl.getUniformLocation(sceneProgram, "iCamRotation"),
     previous: gl.getUniformLocation(sceneProgram, "iPrevAcc"),
@@ -154,7 +156,6 @@ export const createRenderer = (canvas: HTMLCanvasElement, onFpsChange: (fps: num
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
     gl.uniform1i(sceneUniforms.previous, 0);
     gl.uniform2f(sceneUniforms.resolution, width, height);
-    gl.uniform1f(sceneUniforms.time, performance.now() / 1000);
     gl.uniform3fv(sceneUniforms.position, camera.position);
     gl.uniform4fv(sceneUniforms.rotation, camera.rotation);
     gl.uniform1i(sceneUniforms.frame, frameIndex);
@@ -183,7 +184,7 @@ export const createRenderer = (canvas: HTMLCanvasElement, onFpsChange: (fps: num
     frameIndex++;
     fpsFrames++;
     if (time - fpsStart >= 500) {
-      onFpsChange(Math.round(fpsFrames * 1000 / (time - fpsStart)));
+      onStatsChange(Math.round(fpsFrames * 1000 / (time - fpsStart)), frameIndex);
       fpsFrames = 0;
       fpsStart = time;
     }

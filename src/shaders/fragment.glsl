@@ -3,7 +3,6 @@ precision highp float;
 precision highp int;
 
 uniform vec2 iResolution;
-uniform float iTime;
 uniform vec4 iCamRotation;
 uniform vec3 iCamPosition;
 uniform highp sampler2D iPrevAcc;
@@ -72,18 +71,19 @@ vec2 getUv() {
     return (uv - 0.5) * scale + 0.5;
 }
 
-int randomSeed;
+uint randomSeed;
 
 void initRandomSeed() {
-    randomSeed = int(gl_FragCoord.x) * 1973 + int(gl_FragCoord.y) * 9277 + int(iTime * 26699.0);
+    randomSeed = uint(gl_FragCoord.x) + uint(gl_FragCoord.y) * uint(iResolution.x)
+        + uint(iFrameIndex) * 747796405u;
 }
 
 float randFloat() {
-    // 32 bit LCG. Reference for the multiplier and increment:
-    // https://en.wikipedia.org/wiki/Linear_congruential_generator
-    randomSeed = randomSeed * 1664525 + 1013904223;
-    // Keep 15 bits and map them to the inclusive range [0, 1].
-    return float((randomSeed & 0x7FFFFFFF) % 32768) / 32767.0;
+    // pcg mixes the seed bits to reduce visible patterns
+    // https://en.wikipedia.org/wiki/Permuted_congruential_generator
+    randomSeed = randomSeed * 747796405u + 2891336453u;
+    uint word = ((randomSeed >> ((randomSeed >> 28u) + 4u)) ^ randomSeed) * 277803737u;
+    return float(((word >> 22u) ^ word) >> 8u) / 16777216.0;
 }
 
 // ====================
@@ -256,7 +256,7 @@ vec3 rotateByQuaternion(vec3 vector, vec4 rotation) {
 
 Ray generateCameraRay(vec2 uv) {
     // Jitter the ray within a pixel so accumulated samples smooth the edges.
-    uv += vec2(randFloat() - 0.5, randFloat() - 0.5) / iResolution;
+    uv += vec2(randFloat() - 0.5, randFloat() - 0.5) / min(iResolution.x, iResolution.y);
     vec3 localDirection = normalize(vec3(uv * 2.0 - 1.0, -1.5));
     vec3 direction = rotateByQuaternion(localDirection, iCamRotation);
     return Ray(iCamPosition, normalize(direction));
