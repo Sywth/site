@@ -272,8 +272,14 @@ void main() {
 
     Ray ray = generateCameraRay(getUv());
     vec3 sampleColor = iPathTrace ? tracePath(ray) : rayCast(ray);
-    vec3 previous = texture(iPrevAcc, gl_FragCoord.xy / iResolution).rgb;
+    vec4 previous = texture(iPrevAcc, gl_FragCoord.xy / iResolution);
+
     // A zero frame index discards samples from the previous view.
-    vec3 average = (previous * float(iFrameIndex) + sampleColor) / (float(iFrameIndex) + 1.0);
-    outColor = vec4(average, 1.0);
+    vec3 average = (previous.rgb * float(iFrameIndex) + sampleColor) / (float(iFrameIndex) + 1.0);
+
+    // welford's variance sum uses the spare alpha channel.
+    vec3 luminance = vec3(0.2126, 0.7152, 0.0722);
+    float variance = iFrameIndex == 0 ? 0.0 : previous.a
+        + dot(sampleColor - previous.rgb, luminance) * dot(sampleColor - average, luminance);
+    outColor = vec4(average, max(variance, 0.0));
 }

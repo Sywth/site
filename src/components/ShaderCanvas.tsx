@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { createRenderer } from "../lib/renderer";
+import { createRenderer, type RenderStats as Stats } from "../lib/renderer";
+import RenderStats from "./RenderStats";
 
 const ShaderCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<ReturnType<typeof createRenderer>>(null);
-  const [stats, setStats] = useState({ fps: 0, samples: 0 });
+  const [stats, setStats] = useState<Stats>({ fps: 0, samples: 0, noise: [] });
 
   useEffect(() => {
-    const renderer = createRenderer(canvasRef.current!, (fps, samples) =>
-      setStats({ fps, samples }),
-    );
+    const canvas = canvasRef.current;
+    if (canvas === null) {
+      console.error("Canvas ref should not be null.");
+      return;
+    }
+
+    const renderer = createRenderer(canvas, setStats);
     rendererRef.current = renderer;
 
     return () => {
@@ -21,12 +26,7 @@ const ShaderCanvas = () => {
   return (
     <>
       <canvas ref={canvasRef} className="fixed h-full w-full" />
-      <div className="fixed top-4 right-4 grid grid-cols-[auto_auto] gap-x-2 font-mono text-white pointer-events-none">
-        <span className="text-right">FPS:</span>
-        <span>{stats.fps}</span>
-        <span className="text-right">Samples:</span>
-        <span>{stats.samples}</span>
-      </div>
+      <RenderStats stats={stats} />
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2">
         <button
           onClick={() => rendererRef.current?.togglePathTrace()}
