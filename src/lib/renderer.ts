@@ -2,6 +2,9 @@ import vertexShader from "../shaders/vertex.glsl?raw";
 import fragmentShader from "../shaders/fragment.glsl?raw";
 import tonemapShader from "../shaders/tonemap.glsl?raw";
 import { attachCameraControls, createCamera, moveCamera } from "./camera";
+import { isOutsideRoom, roomBounds } from "./room";
+
+const maxFrameSeconds = 0.1;
 
 export type RenderStats = {
   fps: number;
@@ -69,10 +72,13 @@ const createRenderTarget = (gl: WebGL2RenderingContext) => {
 export const createRenderer = (
   canvas: HTMLCanvasElement,
   onStatsChange: (stats: RenderStats) => void,
+  onError: (message: string) => void,
+  onBoundsChange: (outside: boolean) => void,
 ) => {
   const gl = canvas.getContext("webgl2");
   if (!gl || !gl.getExtension("EXT_color_buffer_float")) {
     console.error("WebGL2 with float colour buffers is required.");
+    onError("Your browser cannot display this scene. Try another browser.");
     return null;
   }
 
@@ -81,6 +87,7 @@ export const createRenderer = (
   if (!sceneProgram || !tonemapProgram) {
     gl.deleteProgram(sceneProgram);
     gl.deleteProgram(tonemapProgram);
+    onError("The scene could not start. Please reload the page.");
     return null;
   }
 
@@ -109,6 +116,19 @@ export const createRenderer = (
     scene: gl.getUniformLocation(tonemapProgram, "iScene"),
   };
 
+  gl.useProgram(sceneProgram);
+  gl.uniform3f(
+    gl.getUniformLocation(sceneProgram, "iRoomMin"),
+    roomBounds.left,
+    roomBounds.floor,
+    roomBounds.back,
+  );
+  gl.uniform2f(
+    gl.getUniformLocation(sceneProgram, "iRoomMax"),
+    roomBounds.right,
+    roomBounds.ceiling,
+  );
+
   const targets = [createRenderTarget(gl), createRenderTarget(gl)];
   const camera = createCamera();
   const statsVisible = window.matchMedia("(min-width: 1024px)");
@@ -119,6 +139,7 @@ export const createRenderer = (
   let pathTrace = true;
   let fpsFrames = 0;
   let fpsStart = performance.now();
+  let previousTime = fpsStart;
   let noisePixels = new Float32Array(0);
   let noiseHistory: RenderStats["noise"] = [];
 
@@ -176,6 +197,7 @@ export const createRenderer = (
         gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE
       ) {
         console.error("Render target is incomplete.");
+        onError("The scene could not render. Please reload the page.");
         return false;
       }
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -255,11 +277,16 @@ export const createRenderer = (
   };
 
   const frame = (time: number) => {
+    const seconds = Math.min((time - previousTime) / 1000, maxFrameSeconds);
+    previousTime = time;
     if (!resize()) {
       dispose();
       return;
     }
-    if (moveCamera(camera)) reset();
+    if (moveCamera(camera, seconds)) {
+      reset();
+      onBoundsChange(isOutsideRoom(camera.position));
+    }
     renderToScreen(renderScene());
     frameIndex++;
     fpsFrames++;
@@ -271,6 +298,11 @@ export const createRenderer = (
 
   return {
     dispose,
+    resetCamera: () => {
+      Object.assign(camera, createCamera());
+      reset();
+      onBoundsChange(false);
+    },
     togglePathTrace: () => {
       pathTrace = !pathTrace;
       reset();

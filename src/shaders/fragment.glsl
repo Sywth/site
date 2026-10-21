@@ -5,6 +5,8 @@ precision highp int;
 uniform vec2 iResolution;
 uniform vec4 iCamRotation;
 uniform vec3 iCamPosition;
+uniform vec3 iRoomMin;
+uniform vec2 iRoomMax;
 uniform highp sampler2D iPrevAcc;
 uniform int iFrameIndex;
 uniform bool iPathTrace;
@@ -147,11 +149,11 @@ void loadScene() {
     spheres[2] = Sphere(vec3(2.0, 2.0, -5.0), 0.5, lightMaterial(vec3(3.0, 4.0, 3.5)));
     spheres[3] = Sphere(vec3(-2.5, -0.5, -3.0), 0.15, lightMaterial(vec3(10.0, 8.0, 6.0)));
 
-    planes[0] = Plane(vec3(0.0, 1.0, 0.0), 1.0, whitePaper);
-    planes[1] = Plane(vec3(1.0, 0.0, 0.0), 6.0, paperMaterial(vec3(1.0, 0.0, 0.0)));
-    planes[2] = Plane(vec3(-1.0, 0.0, 0.0), 6.0, paperMaterial(vec3(0.0, 1.0, 0.0)));
-    planes[3] = Plane(vec3(0.0, 0.0, 1.0), 10.0, whitePaper);
-    planes[4] = Plane(vec3(0.0, -1.0, 0.0), 5.0, whitePaper);
+    planes[0] = Plane(vec3(0.0, 1.0, 0.0), -iRoomMin.y, whitePaper);
+    planes[1] = Plane(vec3(1.0, 0.0, 0.0), -iRoomMin.x, paperMaterial(vec3(1.0, 0.0, 0.0)));
+    planes[2] = Plane(vec3(-1.0, 0.0, 0.0), iRoomMax.x, paperMaterial(vec3(0.0, 1.0, 0.0)));
+    planes[3] = Plane(vec3(0.0, 0.0, 1.0), -iRoomMin.z, whitePaper);
+    planes[4] = Plane(vec3(0.0, -1.0, 0.0), iRoomMax.y, whitePaper);
 }
 
 // add extra AO to path tracer on walls
