@@ -11,13 +11,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "class-variance-authority": "latest",
-    "clsx": "latest",
     "gl-matrix": "latest",
-    "lucide-react": "latest",
     "react": "latest",
-    "react-dom": "latest",
-    "tailwind-merge": "latest"
+    "react-dom": "latest"
   },
   "devDependencies": {
     "@eslint/js": "latest",
@@ -32,7 +28,6 @@
     "eslint-plugin-react-refresh": "latest",
     "globals": "latest",
     "tailwindcss": "latest",
-    "tw-animate-css": "latest",
     "typescript": "npm:@typescript/typescript6@latest",
     "typescript-eslint": "latest",
     "vite": "latest"
