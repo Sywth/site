@@ -105,15 +105,14 @@ HitInfo intersectSphere(Ray ray, Sphere sphere) {
 
     float t0 = (-b - sqrt(discriminant)) / (2.0 * a);
     float t1 = (-b + sqrt(discriminant)) / (2.0 * a);
-    if (t0 > TMAX || t1 < TMIN) return getEmptyHit();
 
-    float t = t0;
-    if (t0 < TMIN) t = TMIN;
-    if (t1 > TMAX) t = TMAX;
+    // use near hit or the exit hit if the ray starts inside
+    float t = t0 >= TMIN ? t0 : t1;
+    if (t < TMIN || t > TMAX) return getEmptyHit();
 
     vec3 position = ray.origin + t * ray.direction;
     vec3 normal = normalize(position - sphere.position);
-    if (length(offset) < sphere.radius + 0.001) normal = -normal;
+    if (dot(normal, ray.direction) > 0.0) normal = -normal;
     return HitInfo(true, t, position, normal, sphere.material);
 }
 
@@ -200,7 +199,7 @@ void sampleDirection(vec3 normal, out float probability, out vec3 direction) {
 
 vec3 getReflectance(Material material, vec3 normal, vec3 incoming, vec3 outgoing) {
     // The normal and both directions must be unit vectors.
-    vec3 reflected = reflect(-incoming, normal);
+    vec3 reflected = reflect(incoming, normal);
     vec3 specular = material.specular;
     specular *= (material.glossiness + 2.0) / (2.0 * PI);
     specular *= pow(max(dot(outgoing, reflected), 0.0), material.glossiness);
