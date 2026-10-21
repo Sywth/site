@@ -1,7 +1,7 @@
 #version 300 es
 precision highp float;
 
-uniform sampler2D iScene;
+uniform highp sampler2D iScene;
 uniform vec2 iResolution;
 
 out vec4 fragColor;

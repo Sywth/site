@@ -1,11 +1,12 @@
 #version 300 es
 precision highp float;
+precision highp int;
 
 uniform vec2 iResolution;
 uniform float iTime;
 uniform vec4 iCamRotation;
 uniform vec3 iCamPosition;
-uniform sampler2D iPrevAcc;
+uniform highp sampler2D iPrevAcc;
 uniform int iFrameIndex;
 uniform bool iPathTrace;
 

@@ -131,7 +131,7 @@ export const createRenderer = (canvas: HTMLCanvasElement, onFpsChange: (fps: num
 
     for (const target of targets) {
       gl.bindTexture(gl.TEXTURE_2D, target.texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, width, height, 0, gl.RGBA, gl.HALF_FLOAT, null);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
       if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
         console.error("Render target is incomplete.");
