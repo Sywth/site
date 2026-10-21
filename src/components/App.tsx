@@ -33,6 +33,11 @@ const App = () => (
               LinkedIn
             </a>
           </div>
+          <div className="hover:underline hover:font-bold">
+            <a target="_blank" href="https://github.com/Sywth/site">
+              Source Code
+            </a>
+          </div>
         </GlassBox>
       </div>
     </div>
