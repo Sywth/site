@@ -50,7 +50,7 @@ const createRenderTarget = (gl: WebGL2RenderingContext) => {
   return { texture, framebuffer };
 };
 
-export const createRenderer = (canvas: HTMLCanvasElement) => {
+export const createRenderer = (canvas: HTMLCanvasElement, onFpsChange: (fps: number) => void) => {
   const gl = canvas.getContext("webgl2");
   if (!gl || !gl.getExtension("EXT_color_buffer_float")) {
     console.error("WebGL2 with float colour buffers is required.");
@@ -97,6 +97,8 @@ export const createRenderer = (canvas: HTMLCanvasElement) => {
   let frameIndex = 0;
   let animationFrame = 0;
   let pathTrace = true;
+  let fpsFrames = 0;
+  let fpsStart = performance.now();
 
   const reset = () => {
     frameIndex = 0;
@@ -171,7 +173,7 @@ export const createRenderer = (canvas: HTMLCanvasElement) => {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   };
 
-  const frame = () => {
+  const frame = (time: number) => {
     if (!resize()) {
       dispose();
       return;
@@ -179,6 +181,12 @@ export const createRenderer = (canvas: HTMLCanvasElement) => {
     if (moveCamera(camera)) reset();
     renderToScreen(renderScene());
     frameIndex++;
+    fpsFrames++;
+    if (time - fpsStart >= 500) {
+      onFpsChange(Math.round(fpsFrames * 1000 / (time - fpsStart)));
+      fpsFrames = 0;
+      fpsStart = time;
+    }
     animationFrame = requestAnimationFrame(frame);
   };
 
