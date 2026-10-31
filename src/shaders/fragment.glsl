@@ -18,6 +18,18 @@ const float TMIN = 1e-6;
 const float TMAX = 1e20;
 const int maxPathLength = 12;
 
+const int paperWhite = 0;
+const int paperRed = 1;
+const int paperGreen = 2;
+const int paperBlue = 3;
+const int plasticOrange = 4;
+const int lightCeiling = 5;
+const int lightWarm = 10;
+const int glass = 6;
+const int metal = 7;
+const int checkeredFloor = 8;
+const int mirror = 9;
+
 // ====================
 // Scene types
 // ====================
@@ -33,20 +45,20 @@ struct Material {
 struct Sphere {
     vec3 position;
     float radius;
-    Material material;
+    int materialId;
 };
 
 struct Cylinder {
     vec3 position;
     vec3 axis;
     float radius;
-    Material material;
+    int materialId;
 };
 
 struct Plane {
     vec3 normal;
     float d;           // Plane equation: dot(normal, position) + d = 0.
-    Material material;
+    int materialId;
 };
 
 struct Ray {
@@ -69,6 +81,78 @@ Material paperMaterial(vec3 color) {
 
 Material lightMaterial(vec3 intensity) {
     return Material(intensity, vec3(0.0), vec3(0.0), 1.0, 0.0);
+}
+
+Material checkeredPattern(vec3 position, Material material) {
+    float tile = mod(floor(position.x) + floor(position.z), 2.0);
+    material.diffuse *= mix(1.0, 0.125, tile);
+    return material;
+}
+
+Material getMaterial(int materialId, vec3 position) {
+    switch (materialId) {
+        case paperRed:
+            return paperMaterial(vec3(1.0, 0.0, 0.0));
+        case paperGreen:
+            return paperMaterial(vec3(0.0, 1.0, 0.0));
+        case paperBlue:
+            return paperMaterial(vec3(0.0, 0.0, 1.0));
+        case plasticOrange:
+            return Material(vec3(0.0), vec3(1.0, 0.5, 0.0), vec3(0.5), 50.0, 0.0);
+        case lightCeiling:
+            return lightMaterial(vec3(3.0, 4.0, 3.5));
+        case lightWarm:
+            return lightMaterial(vec3(10.0, 8.0, 6.0));
+        case glass:
+            return Material(vec3(0.0), vec3(0.0), vec3(1.0), 0.0, 1.5);
+        case metal:
+            return Material(vec3(0.0), vec3(0.0), vec3(0.9, 0.92, 0.95), 1000.0, 0.0);
+        case checkeredFloor:
+            return checkeredPattern(position, paperMaterial(vec3(0.8)));
+        case mirror:
+            return Material(vec3(0.0), vec3(0.0), vec3(1.0), 1000.0, 0.0);
+        default:
+            return paperMaterial(vec3(0.8));
+    }
+}
+
+// ====================
+// Scene
+// ====================
+
+const int sphereCount = 4;
+const int cylinderCount = 4;
+const int planeCount = 5;
+const int lightCount = 2;
+const int lightIndices[lightCount] = int[lightCount](2, 3);
+Sphere spheres[sphereCount];
+Plane planes[planeCount];
+Cylinder cylinders[cylinderCount];
+
+void loadScene() {
+    spheres[0] = Sphere(vec3(-1.5, 0.5, -7.0), 1.5, plasticOrange);
+    spheres[1] = Sphere(vec3(1.5, 0.0, -5.0), 1.0, mirror);
+    spheres[2] = Sphere(vec3(2.0, 2.0, -5.0), 0.5, lightCeiling);
+    spheres[3] = Sphere(vec3(-2.5, -0.5, -3.0), 0.15, lightWarm);
+
+    vec3 cylinderPosition = vec3(3.5, 2.0, -5.0);
+    vec3 cylinderAxis = normalize(vec3(0.4, -1.0, -0.4));
+    float cylinderOffsetScalar = 0.2;
+
+    cylinders[0] = Cylinder(cylinderPosition, cylinderAxis, 0.6, glass);
+    cylinders[1] = Cylinder(cylinderPosition + vec3(1,0,0) * cylinderOffsetScalar, cylinderAxis, 0.04, paperRed);
+    cylinders[2] = Cylinder(cylinderPosition, cylinderAxis, 0.04, paperGreen);
+    cylinders[3] = Cylinder(cylinderPosition, cylinderAxis, 0.04, paperBlue);
+
+    cylinders[1].position += vec3( 1, 0, 0) * cylinderOffsetScalar;
+    cylinders[2].position += vec3(-1,-1,-1) * cylinderOffsetScalar;
+    cylinders[3].position += vec3( 0, 0, 1) * cylinderOffsetScalar;
+
+    planes[0] = Plane(vec3( 0.0,  1.0, 0.0), -iRoomMin.y, checkeredFloor);
+    planes[1] = Plane(vec3( 1.0,  0.0, 0.0), -iRoomMin.x, paperRed);
+    planes[2] = Plane(vec3(-1.0,  0.0, 0.0), iRoomMax.x, paperGreen);
+    planes[3] = Plane(vec3( 0.0,  0.0, 1.0), -iRoomMin.z, paperWhite);
+    planes[4] = Plane(vec3( 0.0, -1.0, 0.0), iRoomMax.y, paperWhite);
 }
 
 // ====================
@@ -125,7 +209,7 @@ HitInfo intersectSphere(Ray ray, Sphere sphere) {
     vec3 normal = normalize(position - sphere.position);
     bool frontFace = dot(normal, ray.direction) < 0.0;
     if (!frontFace) normal = -normal;
-    return HitInfo(true, t, position, normal, sphere.material, frontFace);
+    return HitInfo(true, t, position, normal, getMaterial(sphere.materialId, position), frontFace);
 }
 
 HitInfo intersectCylinder(Ray ray, Cylinder cylinder) {
@@ -151,7 +235,7 @@ HitInfo intersectCylinder(Ray ray, Cylinder cylinder) {
     vec3 normal = normalize(surfaceOffset - cylinder.axis * dot(surfaceOffset, cylinder.axis));
     bool frontFace = dot(normal, ray.direction) < 0.0;
     if (!frontFace) normal = -normal;
-    return HitInfo(true, t, position, normal, cylinder.material, frontFace);
+    return HitInfo(true, t, position, normal, getMaterial(cylinder.materialId, position), frontFace);
 }
 
 HitInfo intersectPlane(Ray ray, Plane plane) {
@@ -163,52 +247,7 @@ HitInfo intersectPlane(Ray ray, Plane plane) {
     if (t < TMIN || t > TMAX) return getEmptyHit();
 
     vec3 position = ray.origin + t * ray.direction;
-    return HitInfo(true, t, position, normalize(plane.normal), plane.material, true);
-}
-
-// ====================
-// Scene
-// ====================
-
-const int sphereCount = 4;
-const int cylinderCount = 4;
-const int planeCount = 5;
-const int lightCount = 2;
-const int lightIndices[lightCount] = int[lightCount](2, 3);
-Sphere spheres[sphereCount];
-Plane planes[planeCount];
-Cylinder cylinders[cylinderCount];
-
-void loadScene() {
-    Material mirror = Material(vec3(0.0), vec3(0.0), vec3(1.0), 1000.0, 0.0);
-    Material metal = Material(vec3(0.0), vec3(0.0), vec3(0.9, 0.92, 0.95), 1000.0, 0.0);
-    Material glass = Material(vec3(0.0), vec3(0.0), vec3(1.0), 0.0, 1.5);
-    Material orangePlastic = Material(vec3(0.0), vec3(1.0, 0.5, 0.0), vec3(0.5), 50.0, 0.0);
-
-    Material whitePaper = paperMaterial(vec3(0.8));
-    Material redPaper = paperMaterial(vec3(1.0, 0.0, 0.0));
-    Material greenPaper = paperMaterial(vec3(0.0, 1.0, 0.0));
-    Material bluePaper = paperMaterial(vec3(0.0, 0.0, 1.0));
-
-    spheres[0] = Sphere(vec3(-1.5, 0.5, -7.0), 1.5, orangePlastic);
-    spheres[1] = Sphere(vec3(1.5, 0.0, -5.0), 1.0, mirror);
-    spheres[2] = Sphere(vec3(2.0, 2.0, -5.0), 0.5, lightMaterial(vec3(3.0, 4.0, 3.5)));
-    spheres[3] = Sphere(vec3(-2.5, -0.5, -3.0), 0.15, lightMaterial(vec3(10.0, 8.0, 6.0)));
-
-    vec3 cylinderPosition = vec3(3.5, 2.0, -5.0);
-    vec3 cylinderAxis = normalize(vec3(0.4, -1.0, -0.4));
-    float cylinderOffsetScalar = 0.2;
-
-    cylinders[0] = Cylinder(cylinderPosition, cylinderAxis, 0.6, glass);
-    cylinders[1] = Cylinder(cylinderPosition + vec3(1,0,0) * cylinderOffsetScalar, cylinderAxis, 0.04, redPaper);
-    cylinders[2] = Cylinder(cylinderPosition + vec3(-1,-1,1) * cylinderOffsetScalar, cylinderAxis, 0.04, greenPaper);
-    cylinders[3] = Cylinder(cylinderPosition + vec3(0,0,1) * cylinderOffsetScalar, cylinderAxis, 0.04, bluePaper);
-
-    planes[0] = Plane(vec3(0.0, 1.0, 0.0), -iRoomMin.y, whitePaper);
-    planes[1] = Plane(vec3(1.0, 0.0, 0.0), -iRoomMin.x, redPaper);
-    planes[2] = Plane(vec3(-1.0, 0.0, 0.0), iRoomMax.x, greenPaper);
-    planes[3] = Plane(vec3(0.0, 0.0, 1.0), -iRoomMin.z, whitePaper);
-    planes[4] = Plane(vec3(0.0, -1.0, 0.0), iRoomMax.y, whitePaper);
+    return HitInfo(true, t, position, normalize(plane.normal), getMaterial(plane.materialId, position), true);
 }
 
 // add extra AO to path tracer on walls
@@ -302,7 +341,7 @@ vec3 sampleDirectLight(HitInfo hit, vec3 incoming) {
 
     float probability = 1.0 / (float(lightCount) * 2.0 * PI * coneWidth);
     return getReflectance(hit.material, hit.normal, incoming, direction)
-        * light.material.emissive * cosine / probability;
+        * lightHit.material.emissive * cosine / probability;
 }
 
 Ray sampleGlassRay(Ray ray, HitInfo hit, inout vec3 throughput) {
