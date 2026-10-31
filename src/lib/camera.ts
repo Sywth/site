@@ -3,8 +3,8 @@ import { quat, vec3 } from "gl-matrix";
 const moveSpeed = 6;
 
 export const createCamera = () => ({
-  position: vec3.fromValues(0, 1, 2),
-  rotation: quat.create(),
+  position: vec3.fromValues(4.2, 1.9, -1.9),
+  rotation: quat.fromValues(-0.1, 0.3, 0.05, 0.94),
   keys: new Set<string>(),
 });
 
@@ -31,8 +31,16 @@ export const attachCameraControls = (camera: Camera, reset: () => void) => {
   const handleMouseMove = (event: MouseEvent) => {
     if (event.buttons !== 1) return;
 
-    const yaw = quat.setAxisAngle(quat.create(), [0, 1, 0], -event.movementX * 0.005);
-    const pitch = quat.setAxisAngle(quat.create(), [1, 0, 0], -event.movementY * 0.005);
+    const yaw = quat.setAxisAngle(
+      quat.create(),
+      [0, 1, 0],
+      -event.movementX * 0.005,
+    );
+    const pitch = quat.setAxisAngle(
+      quat.create(),
+      [1, 0, 0],
+      -event.movementY * 0.005,
+    );
     quat.multiply(camera.rotation, yaw, camera.rotation);
     quat.multiply(camera.rotation, camera.rotation, pitch);
     quat.normalize(camera.rotation, camera.rotation);
